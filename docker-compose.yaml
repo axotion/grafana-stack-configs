@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  grafana:
+    image: grafana/grafana:11.1.1-ubuntu
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-pyroscope-app
+      - GF_SERVER_HTTP_ADDR=0.0.0.0
+
+  loki:
+    image: grafana/loki:main-629671e
+    ports:
+      - 3100:3100
+    volumes:
+      - ./loki-config.yaml:/etc/loki/loki-config.yaml
+    
+  tempo:
+    image: grafana/tempo:main-5a6f140
+    ports:
+      - "14268:14268"
+      - "3200:3200"
+      - "4320:4317"
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo/tempo.yaml
+
+  pyroscope:
+    image: grafana/pyroscope:1.7.1
+    container_name: pyroscope
+    ports:
+      - "4040:4040"
+    volumes:
+      - pyroscope-storage:/var/lib/pyroscope
+
+
+  prometheus:
+    image: prom/prometheus:v2.53.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --enable-feature=native-histograms
+      - --log.level=debug
+      - --web.enable-remote-write-receiver
+    ports:
+      - "9090:9090"
+      - "9464:9464"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.106.1
+    ports:
+      - "4317:4317" # gRPC
+      - "4318:4318" # HTTP
+      - "8889:8889" # Prometheus metrics exporter
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command:
+      [
+        "--config", "/etc/otel-collector-config.yaml"
+      ]
+
+volumes:
+  grafana-storage:
+  pyroscope-storage:
